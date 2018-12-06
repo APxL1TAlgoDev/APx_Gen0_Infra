@@ -1,0 +1,434 @@
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+library UNISIM;
+use UNISIM.vcomponents.all;
+
+library work;
+use work.ctp7_v7_build_cfg_pkg.all;
+
+use work.gth_pkg.all;
+use work.link_align_pkg.all;
+use work.link_buffer_pkg.all;
+use work.ctp7_utils_pkg.all;
+use work.ttc_pkg.all;
+
+--============================================================================
+--                                                          Entity declaration
+--============================================================================
+entity register_file is
+  port (
+
+    clk240_i : in std_logic;
+    clk40_i  : in std_logic;
+
+    BRAM_CTRL_REG_FILE_en   : in  std_logic;
+    BRAM_CTRL_REG_FILE_dout : out std_logic_vector (31 downto 0);
+    BRAM_CTRL_REG_FILE_din  : in  std_logic_vector (31 downto 0);
+    BRAM_CTRL_REG_FILE_we   : in  std_logic_vector (3 downto 0);
+    BRAM_CTRL_REG_FILE_addr : in  std_logic_vector (16 downto 0);
+    BRAM_CTRL_REG_FILE_clk  : in  std_logic;
+    BRAM_CTRL_REG_FILE_rst  : in  std_logic;
+
+    ttc_mmcm_ctrl_o  : out t_ttc_mmcm_ctrl;
+    ttc_mmcm_stat_i  : in  t_ttc_mmcm_stat;
+    ttc_ctrl_o       : out t_ttc_ctrl;
+    ttc_stat_i       : in  t_ttc_stat;
+    ttc_diag_cntrs_i : in  t_ttc_diag_cntrs;
+    ttc_daq_cntrs_i  : in  t_ttc_daq_cntrs;
+
+    algo_reset : out std_logic;
+
+    LED_FP_o : out std_logic_vector(31 downto 0);
+
+    link_latency_ctrl_o          : out std_logic_vector(15 downto 0);
+    link_mask_ctrl_o             : out std_logic_vector(63 downto 0);
+    link_aligned_diagnostics_arr : in  t_link_aligned_diagnostics_arr(63 downto 0);
+    link_aligned_status_arr_i    : in  t_link_aligned_status_arr(63 downto 0);
+
+    link_align_req_o   : out std_logic;
+    link_latency_err_i : in  std_logic;
+
+    gth_gt_txreset_done_i : in std_logic_vector(63 downto 0);
+    gth_gt_rxreset_done_i : in std_logic_vector(63 downto 0);
+
+    link_buffer_ctrl_RX_arr   : out t_link_buffer_ctrl_arr(63 downto 0);
+    link_buffer_status_RX_arr : in  t_link_buffer_status_arr(63 downto 0);
+
+    link_buffer_ctrl_TX_arr   : out t_link_buffer_ctrl_arr(63 downto 0);
+    link_buffer_status_TX_arr : in  t_link_buffer_status_arr(63 downto 0)
+
+
+    );
+end register_file;
+
+--============================================================================
+--                                                        Architecture section
+--============================================================================
+architecture register_file_arch of register_file is
+
+--============================================================================
+--                                                         Signal declarations
+--============================================================================
+
+
+  signal s_bx_id_at_marker : t_slv_arr_16(63 downto 0);
+  signal s_rx_link_status  : t_slv_arr_16(63 downto 0);
+
+
+  constant C_LINK_STAT_CH0_ADDR        : integer := 0;
+  constant C_BXID_LINK_OFFSET_CH0_ADDR : integer := 4;
+  constant C_LINK_MASK_CH0_ADDR        : integer := 8;
+
+  constant C_CH_to_CH_ADDR_OFFSET : integer := 4 * 64;
+
+  constant C_TTC_MMCM_RST           : integer := 16#1_0000#;
+  constant C_TTC_MMCM_LOCKED        : integer := 16#1_0004#;
+  constant C_TTC_MMCM_PHASE_SHIFT   : integer := 16#1_0008#;
+  constant C_TTC_STAT_RST           : integer := 16#1_000C#;
+  constant C_TTC_BX0_LOCKED         : integer := 16#1_0010#;
+  constant C_TTC_BX0_ERR            : integer := 16#1_0014#;
+  constant C_TTC_BX0_UNLOCKED_CNT   : integer := 16#1_0018#;
+  constant C_TTC_BX0_UDF_CNT        : integer := 16#1_001C#;
+  constant C_TTC_BX0_OVF_CNT        : integer := 16#1_0020#;
+  constant C_TTC_DEC_SINGLE_ERR_CNT : integer := 16#1_0024#;
+  constant C_TTC_DEC_DOUBLE_ERR_CNT : integer := 16#1_0028#;
+  constant C_TTC_BX0_CMD            : integer := 16#1_002C#;
+  constant C_TTC_EC0_CMD            : integer := 16#1_0030#;
+  constant C_TTC_RESYNC_CMD         : integer := 16#1_0034#;
+  constant C_TTC_OC0_CMD            : integer := 16#1_0038#;
+  constant C_TTC_TEST_SYNC_CMD      : integer := 16#1_003C#;
+  constant C_TTC_START_CMD          : integer := 16#1_0040#;
+  constant C_TTC_STOP_CMD           : integer := 16#1_0044#;
+  constant C_TTC_ORBIT_DELAY        : integer := 16#1_0048#;
+  constant C_TTC_L1A_ENABLE         : integer := 16#1_004C#;
+  constant C_TTC_L1A_CNT            : integer := 16#1_0050#;
+  constant C_TTC_BX0_CNT            : integer := 16#1_0054#;
+  constant C_TTC_EC0_CNT            : integer := 16#1_0058#;
+  constant C_TTC_RESYNC_CNT         : integer := 16#1_005C#;
+  constant C_TTC_OC0_CNT            : integer := 16#1_0060#;
+  constant C_TTC_TEST_SYNC_CNT      : integer := 16#1_0064#;
+  constant C_TTC_START_CNT          : integer := 16#1_0068#;
+  constant C_TTC_STOP_CNT           : integer := 16#1_006C#;
+  constant C_TTC_L1ID_CNT           : integer := 16#1_0070#;
+  constant C_TTC_ORBIT_CNT          : integer := 16#1_0074#;
+
+  constant C_LINK_ALIGN_REQ : integer := 16#1_A000#;
+  constant C_LINK_ALIGN_LAT : integer := 16#1_A004#;
+  constant C_LINK_ALIGN_ERR : integer := 16#1_A008#;
+
+  constant C_ALGO_RESET : integer := 16#1_B000#;
+
+  constant C_LINK_BUFFER_RX_CAP_nPB    : integer := 16#1_C000#;
+  constant C_LINK_BUFFER_RX_CAP_ARM    : integer := 16#1_C004#;
+  constant C_LINK_BUFFER_RX_MODE       : integer := 16#1_C008#;
+  constant C_LINK_BUFFER_RX_START_BXID : integer := 16#1_C00C#;
+
+  constant C_LINK_BUFFER_TX_CAP_nPB    : integer := 16#1_C020#;
+  constant C_LINK_BUFFER_TX_CAP_ARM    : integer := 16#1_C024#;
+  constant C_LINK_BUFFER_TX_MODE       : integer := 16#1_C028#;
+  constant C_LINK_BUFFER_TX_START_BXID : integer := 16#1_C02C#;
+
+  constant C_UPTIME_CNT : integer := 16#1_FFF0#;
+
+
+  signal s_link_buf_rx_cap_npb  : std_logic;
+  signal s_link_buf_rx_cap_arm  : std_logic;
+  signal s_link_buf_rx_mode     : std_logic_vector(1 downto 0);
+  signal s_link_buf_rx_cap_bxid : std_logic_vector(11 downto 0);
+
+  signal s_link_buf_tx_cap_npb  : std_logic;
+  signal s_link_buf_tx_cap_arm  : std_logic;
+  signal s_link_buf_tx_mode     : std_logic_vector(1 downto 0);
+  signal s_link_buf_tx_cap_bxid : std_logic_vector(11 downto 0);
+
+  signal s_algo_reset : std_logic;
+
+
+  signal s_ttc_mmcm_ctrl : t_ttc_mmcm_ctrl;
+  signal s_ttc_mmcm_stat : t_ttc_mmcm_stat;
+
+  signal s_ttc_ctrl : t_ttc_ctrl := (
+    bc0_cmd       => C_TTC_BGO_BC0,
+    ec0_cmd       => C_TTC_BGO_EC0,
+    resync_cmd    => C_TTC_BGO_RESYNC,
+    oc0_cmd       => C_TTC_BGO_OC0,
+    test_sync_cmd => C_TTC_BGO_TEST_SYNC,
+    start_cmd     => C_TTC_BGO_START,
+    stop_cmd      => C_TTC_BGO_STOP,
+    orbit_delay   => x"85",
+    l1a_enable    => '0',
+    stat_reset    => '0'
+    );
+
+  signal s_ttc_stat       : t_ttc_stat;
+  signal s_ttc_diag_cntrs : t_ttc_diag_cntrs;
+  signal s_ttc_daq_cntrs  : t_ttc_daq_cntrs;
+
+  signal s_mmcm_rst     : std_logic;
+  signal s_ttc_stat_rst : std_logic;
+
+  signal s_orbit_cnt_read      : std_logic;
+  signal s_orbit_cnt_read_sync : std_logic;
+
+  signal s_orbit_cnt_latched : std_logic_vector(31 downto 0);
+
+  constant C_REG_FILE_CLK_FREQ : integer := 50_000_000;
+
+  signal s_uptime_second_cnt : unsigned(31 downto 0);
+  signal s_free_running_cnt  : integer range 0 to C_REG_FILE_CLK_FREQ - 1;
+  signal s_link_mask         : std_logic_vector(63 downto 0) := (others => '1');
+
+  signal s_link_align_req    : std_logic;
+  signal s_link_latency_ctrl : std_logic_vector(15 downto 0);
+
+--============================================================================
+--                                                          Architecture begin
+--============================================================================
+
+begin
+
+  algo_reset <= s_algo_reset;
+
+  -- Input/Outputs
+  ttc_mmcm_ctrl_o  <= s_ttc_mmcm_ctrl;
+  s_ttc_mmcm_stat  <= ttc_mmcm_stat_i;
+  ttc_ctrl_o       <= s_ttc_ctrl;
+  s_ttc_stat       <= ttc_stat_i;
+  s_ttc_diag_cntrs <= ttc_diag_cntrs_i;
+  s_ttc_daq_cntrs  <= ttc_daq_cntrs_i;
+
+  -- Clock crossing or extension
+  i_pulse_sync_1_way_orbit : pulse_sync_1_way
+    port map (
+      clk1_i           => BRAM_CTRL_REG_FILE_clk,
+      pulse_in_clk1_i  => s_orbit_cnt_read,
+      clk2_i           => clk40_i,
+      pulse_out_clk2_o => s_orbit_cnt_read_sync
+      );
+
+  process (clk40_i) is
+  begin
+    if (rising_edge(clk40_i)) then
+      if (s_orbit_cnt_read_sync = '1') then
+        s_orbit_cnt_latched <= s_ttc_daq_cntrs.orbit;
+      end if;
+    end if;
+  end process;
+
+  i_pulse_extend_1 : pulse_extend
+    generic map (DELAY_CNT_LENGTH => 2
+                 ) port map (
+                   clk_i          => BRAM_CTRL_REG_FILE_clk,
+                   rst_i          => '0',
+                   pulse_length_i => "11",
+                   pulse_i        => s_mmcm_rst,
+                   pulse_o        => s_ttc_mmcm_ctrl.reset
+                   );
+
+  i_pulse_extend_2 : pulse_extend
+    generic map (DELAY_CNT_LENGTH => 2
+                 ) port map(
+                   clk_i          => BRAM_CTRL_REG_FILE_clk,
+                   rst_i          => '0',
+                   pulse_length_i => "11",
+                   pulse_i        => s_ttc_stat_rst,
+                   pulse_o        => s_ttc_ctrl.stat_reset
+                   );
+
+  link_align_req_o    <= s_link_align_req;
+  link_latency_ctrl_o <= s_link_latency_ctrl;
+  link_mask_ctrl_o    <= s_link_mask;
+
+  gen_cap_logic : for i in 0 to 63 generate
+
+
+    link_buffer_ctrl_RX_arr(i).CAP_nPB    <= s_link_buf_rx_cap_npb;
+    link_buffer_ctrl_RX_arr(i).arm        <= s_link_buf_rx_cap_arm;
+    link_buffer_ctrl_RX_arr(i).start_bcid <= s_link_buf_rx_cap_bxid;
+    link_buffer_ctrl_RX_arr(i).mode       <= s_link_buf_rx_mode;
+
+    link_buffer_ctrl_TX_arr(i).CAP_nPB    <= s_link_buf_tx_cap_npb;
+    link_buffer_ctrl_TX_arr(i).arm        <= s_link_buf_tx_cap_arm;
+    link_buffer_ctrl_TX_arr(i).start_bcid <= s_link_buf_tx_cap_bxid;
+    link_buffer_ctrl_TX_arr(i).mode       <= s_link_buf_tx_mode;
+
+    s_bx_id_at_marker(i) <= link_aligned_diagnostics_arr(i).bx_id_at_marker;
+
+    s_rx_link_status(i)(0) <= link_aligned_status_arr_i(i).link_OK_extended;
+    s_rx_link_status(i)(1) <= link_aligned_status_arr_i(i).alignment_marker_found;
+    s_rx_link_status(i)(2) <= gth_gt_txreset_done_i(i);
+    s_rx_link_status(i)(3) <= gth_gt_rxreset_done_i(i);
+    s_rx_link_status(i)(4) <= '0';
+    s_rx_link_status(i)(5) <= '0';
+    s_rx_link_status(i)(6) <= '0';
+    s_rx_link_status(i)(7) <= '0';
+
+    s_rx_link_status(i)(8) <= link_aligned_status_arr_i(i).link_ERR_latched;
+
+    s_rx_link_status(i)(11) <= link_aligned_status_arr_i(i).fifo_empty;
+    s_rx_link_status(i)(12) <= link_aligned_status_arr_i(i).fifo_full;
+    s_rx_link_status(i)(13) <= link_aligned_status_arr_i(i).fifo_undrf;
+    s_rx_link_status(i)(14) <= link_aligned_status_arr_i(i).fifo_ovrf;
+
+    s_rx_link_status(i)(15) <= s_link_mask(i);
+
+  end generate;
+
+----------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------
+--                                                                                                         BRAM Controller Write Section
+----------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------
+
+  process (BRAM_CTRL_REG_FILE_clk)
+  begin
+    if(rising_edge(BRAM_CTRL_REG_FILE_clk)) then
+
+      s_link_align_req <= '0';
+
+      -- Default values (e.g. latches)
+      s_mmcm_rst     <= '0';
+      s_ttc_stat_rst <= '0';
+
+      s_ttc_mmcm_ctrl.phase_shift <= '0';
+      s_orbit_cnt_read            <= '0';
+
+      if(BRAM_CTRL_REG_FILE_en = '1' and BRAM_CTRL_REG_FILE_we = "1111") then
+
+        for i in 0 to 63 loop
+          if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_MASK_CH0_ADDR, C_CH_to_CH_ADDR_OFFSET, i, 17)) then s_link_mask(i) <= BRAM_CTRL_REG_FILE_din(0); end if; end loop;
+
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_ALIGN_REQ, 0, 0, 17)) then s_link_align_req    <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_ALIGN_LAT, 0, 0, 17)) then s_link_latency_ctrl <= BRAM_CTRL_REG_FILE_din(15 downto 0); end if;
+
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_ALGO_RESET, 0, 0, 17)) then s_algo_reset <= BRAM_CTRL_REG_FILE_din(0); end if;
+
+
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_CAP_nPB, 0, 0, 17)) then s_link_buf_rx_cap_npb     <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_CAP_ARM, 0, 0, 17)) then s_link_buf_rx_cap_arm     <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_MODE, 0, 0, 17)) then s_link_buf_rx_mode           <= BRAM_CTRL_REG_FILE_din(1 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_START_BXID, 0, 0, 17)) then s_link_buf_rx_cap_bxid <= BRAM_CTRL_REG_FILE_din(11 downto 0); end if;
+
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_CAP_nPB, 0, 0, 17)) then s_link_buf_tx_cap_npb     <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_CAP_ARM, 0, 0, 17)) then s_link_buf_tx_cap_arm     <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_MODE, 0, 0, 17)) then s_link_buf_tx_mode           <= BRAM_CTRL_REG_FILE_din(1 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_START_BXID, 0, 0, 17)) then s_link_buf_tx_cap_bxid <= BRAM_CTRL_REG_FILE_din(11 downto 0); end if;
+
+-- addr_encode(C_LINK_MASK_CH0_ADDR, 0, 0, 17)
+
+        -- TTC module
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_MMCM_RST, 0, 0, 17)) then s_mmcm_rst                          <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_MMCM_PHASE_SHIFT, 0, 0, 17)) then s_ttc_mmcm_ctrl.phase_shift <= BRAM_CTRL_REG_FILE_din(0); end if;
+
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_STAT_RST, 0, 0, 17)) then s_ttc_stat_rst                <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_CMD, 0, 0, 17)) then s_ttc_ctrl.bc0_cmd             <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_EC0_CMD, 0, 0, 17)) then s_ttc_ctrl.ec0_cmd             <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_RESYNC_CMD, 0, 0, 17)) then s_ttc_ctrl.resync_cmd       <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_OC0_CMD, 0, 0, 17)) then s_ttc_ctrl.oc0_cmd             <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_TEST_SYNC_CMD, 0, 0, 17)) then s_ttc_ctrl.test_sync_cmd <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_START_CMD, 0, 0, 17)) then s_ttc_ctrl.start_cmd         <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_STOP_CMD, 0, 0, 17)) then s_ttc_ctrl.stop_cmd           <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_ORBIT_DELAY, 0, 0, 17)) then s_ttc_ctrl.orbit_delay     <= BRAM_CTRL_REG_FILE_din(7 downto 0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_L1A_ENABLE, 0, 0, 17)) then s_ttc_ctrl.l1a_enable       <= BRAM_CTRL_REG_FILE_din(0); end if;
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_ORBIT_CNT, 0, 0, 17)) then s_orbit_cnt_read             <= BRAM_CTRL_REG_FILE_din(0); end if;
+
+      end if;
+    end if;
+  end process;
+
+----------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------
+--                                                                                                          BRAM Controller Read Section
+----------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------
+
+  LED_FP_o <= (others => '0');
+
+  process (BRAM_CTRL_REG_FILE_clk) is
+    variable dout : std_logic_vector (31 downto 0);
+  begin
+    if(rising_edge(BRAM_CTRL_REG_FILE_clk)) then
+
+      dout := (others => '0');
+
+      for i in 0 to 63 loop
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_STAT_CH0_ADDR, C_CH_to_CH_ADDR_OFFSET, i, 17)) then dout(15 downto 0) := dout(15 downto 0) or s_rx_link_status(i); end if; end loop;
+      for i in 0 to 63 loop
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_BXID_LINK_OFFSET_CH0_ADDR, C_CH_to_CH_ADDR_OFFSET, i, 17)) then dout(15 downto 0) := dout(15 downto 0) or s_bx_id_at_marker(i); end if; end loop;
+      for i in 0 to 63 loop
+        if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_MASK_CH0_ADDR, C_CH_to_CH_ADDR_OFFSET, i, 17)) then dout(0) := dout(0) or s_link_mask(i); end if; end loop;
+
+
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_ALIGN_REQ, 0, 0, 17)) then dout(0)           := dout(0) or s_link_align_req; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_ALIGN_LAT, 0, 0, 17)) then dout(15 downto 0) := dout(15 downto 0) or s_link_latency_ctrl; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_ALIGN_ERR, 0, 0, 17)) then dout(0)           := dout(0) or link_latency_err_i; end if;
+
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_ALGO_RESET, 0, 0, 17)) then dout(0) := dout(0) or s_algo_reset; end if;
+
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_CAP_nPB, 0, 0, 17)) then dout(0)              := dout(0) or s_link_buf_rx_cap_npb; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_CAP_ARM, 0, 0, 17)) then dout(0)              := dout(0) or s_link_buf_rx_cap_arm; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_MODE, 0, 0, 17)) then dout(1 downto 0)        := dout(1 downto 0) or s_link_buf_rx_mode; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_RX_START_BXID, 0, 0, 17)) then dout(11 downto 0) := dout(11 downto 0) or s_link_buf_rx_cap_bxid; end if;
+
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_CAP_nPB, 0, 0, 17)) then dout(0)              := dout(0) or s_link_buf_tx_cap_npb; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_CAP_ARM, 0, 0, 17)) then dout(0)              := dout(0) or s_link_buf_tx_cap_arm; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_MODE, 0, 0, 17)) then dout(1 downto 0)        := dout(1 downto 0) or s_link_buf_tx_mode; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_LINK_BUFFER_TX_START_BXID, 0, 0, 17)) then dout(11 downto 0) := dout(11 downto 0) or s_link_buf_tx_cap_bxid; end if;
+
+
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_MMCM_LOCKED, 0, 0, 17)) then dout(0)                  := dout(0) or s_ttc_mmcm_stat.locked; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_LOCKED, 0, 0, 17)) then dout(0)                   := dout(0) or s_ttc_stat.bc0_stat.locked; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_ERR, 0, 0, 17)) then dout(0)                      := dout(0) or s_ttc_stat.bc0_stat.err; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_UNLOCKED_CNT, 0, 0, 17)) then dout(15 downto 0)   := dout(15 downto 0) or s_ttc_stat.bc0_stat.unlocked_cnt; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_UDF_CNT, 0, 0, 17)) then dout(15 downto 0)        := dout(15 downto 0) or s_ttc_stat.bc0_stat.udf_cnt; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_OVF_CNT, 0, 0, 17)) then dout(15 downto 0)        := dout(15 downto 0) or s_ttc_stat.bc0_stat.ovf_cnt; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_DEC_SINGLE_ERR_CNT, 0, 0, 17)) then dout(15 downto 0) := dout(15 downto 0) or s_ttc_stat.single_err; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_DEC_DOUBLE_ERR_CNT, 0, 0, 17)) then dout(15 downto 0) := dout(15 downto 0) or s_ttc_stat.double_err; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_CMD, 0, 0, 17)) then dout(7 downto 0)             := dout(7 downto 0) or s_ttc_ctrl.bc0_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_EC0_CMD, 0, 0, 17)) then dout(7 downto 0)             := dout(7 downto 0) or s_ttc_ctrl.ec0_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_RESYNC_CMD, 0, 0, 17)) then dout(7 downto 0)          := dout(7 downto 0) or s_ttc_ctrl.resync_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_OC0_CMD, 0, 0, 17)) then dout(7 downto 0)             := dout(7 downto 0) or s_ttc_ctrl.oc0_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_TEST_SYNC_CMD, 0, 0, 17)) then dout(7 downto 0)       := dout(7 downto 0) or s_ttc_ctrl.test_sync_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_START_CMD, 0, 0, 17)) then dout(7 downto 0)           := dout(7 downto 0) or s_ttc_ctrl.start_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_STOP_CMD, 0, 0, 17)) then dout(7 downto 0)            := dout(7 downto 0) or s_ttc_ctrl.stop_cmd; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_ORBIT_DELAY, 0, 0, 17)) then dout(7 downto 0)         := dout(7 downto 0) or s_ttc_ctrl.orbit_delay; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_L1A_ENABLE, 0, 0, 17)) then dout(0)                   := dout(0) or s_ttc_ctrl.l1a_enable; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_L1A_CNT, 0, 0, 17)) then dout(31 downto 0)            := dout(31 downto 0) or s_ttc_diag_cntrs.l1a; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_BX0_CNT, 0, 0, 17)) then dout(31 downto 0)            := dout(31 downto 0) or s_ttc_diag_cntrs.bc0; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_EC0_CNT, 0, 0, 17)) then dout(31 downto 0)            := dout(31 downto 0) or s_ttc_diag_cntrs.ec0; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_RESYNC_CNT, 0, 0, 17)) then dout(31 downto 0)         := dout(31 downto 0) or s_ttc_diag_cntrs.resync; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_OC0_CNT, 0, 0, 17)) then dout(31 downto 0)            := dout(31 downto 0) or s_ttc_diag_cntrs.oc0; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_TEST_SYNC_CNT, 0, 0, 17)) then dout(31 downto 0)      := dout(31 downto 0) or s_ttc_diag_cntrs.test_sync; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_START_CNT, 0, 0, 17)) then dout(31 downto 0)          := dout(31 downto 0) or s_ttc_diag_cntrs.start; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_STOP_CNT, 0, 0, 17)) then dout(31 downto 0)           := dout(31 downto 0) or s_ttc_diag_cntrs.stop; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_L1ID_CNT, 0, 0, 17)) then dout(31 downto 0)           := dout(31 downto 0) or s_ttc_daq_cntrs.L1ID; end if;
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_TTC_ORBIT_CNT, 0, 0, 17)) then dout(31 downto 0)          := dout(31 downto 0) or s_orbit_cnt_latched; end if;
+
+      if (BRAM_CTRL_REG_FILE_addr = addr_encode(C_UPTIME_CNT, 0, 0, 17)) then dout(31 downto 0) := dout(31 downto 0) or std_logic_vector(s_uptime_second_cnt); end if;
+
+      BRAM_CTRL_REG_FILE_dout <= dout;
+    end if;
+  end process;
+
+-- Uptime counter
+  process (BRAM_CTRL_REG_FILE_clk)
+  begin
+    if(rising_edge(BRAM_CTRL_REG_FILE_clk)) then
+      s_free_running_cnt <= s_free_running_cnt + 1;
+
+      if (s_free_running_cnt = C_REG_FILE_CLK_FREQ - 1) then
+        s_free_running_cnt  <= 0;
+        s_uptime_second_cnt <= s_uptime_second_cnt + 1;
+      end if;
+    end if;
+  end process;
+
+
+end register_file_arch;
+--============================================================================
+--                                                            Architecture end
+--============================================================================
+
