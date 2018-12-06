@@ -8,8 +8,6 @@ set_property STEPS.SYNTH_DESIGN.ARGS.KEEP_EQUIVALENT_REGISTERS true [get_runs sy
 set_property STEPS.SYNTH_DESIGN.ARGS.RETIMING true [get_runs synth_1]
 set_property STEPS.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY rebuilt [get_runs synth_1]
 
-set_property file_type {VHDL 2008} [get_files "$::DIR_PATH/hdl/*.vhd"]
-
 # # Load common and sub-module ruckus.tcl files
 #loadRuckusTcl $::env(PROJ_DIR)/../../../
 #loadRuckusTcl $::env(PROJ_DIR)
@@ -23,5 +21,8 @@ loadIpCore      -dir "$::DIR_PATH/ip_repo/"
 
 loadBlockDesign -path "$::DIR_PATH/bd/2017.3/v7_bd.bd"
 
-# Load HLS algo
-loadRuckusTcl  "$::DIR_PATH/../../APx_Gen0_Algo/VivadoHls/null_algo"
+set_property file_type {VHDL 2008} [get_files "$::DIR_PATH/hdl/*.vhd"]
+
+#Load HLS alg o via Ruckus helper script (you should provide below absolute or relative path to ruckus.tcl)
+# loadRuckusTcl "$::DIR_PATH/../../APx_Gen0_Algo/VivadoHls/null_algo"
+loadRuckusTcl  "/tmp/algo/APx_Gen0_Algo/VivadoHls/null_algo"
