@@ -1,0 +1,3 @@
+[submodule "submodules/ruckus"]
+	path = submodules/ruckus
+	url = https://github.com/slaclab/ruckus
