@@ -23,6 +23,6 @@ loadBlockDesign -path "$::DIR_PATH/bd/2017.3/v7_bd.bd"
 
 set_property file_type {VHDL 2008} [get_files "$::DIR_PATH/hdl/*.vhd"]
 
-#Load HLS alg o via Ruckus helper script (you should provide below absolute or relative path to ruckus.tcl)
-# loadRuckusTcl "$::DIR_PATH/../../APx_Gen0_Algo/VivadoHls/null_algo"
-loadRuckusTcl  "/tmp/algo/APx_Gen0_Algo/VivadoHls/null_algo"
+#Load HLS algo via Ruckus helper script (you should provide below relative OR absolute path to ruckus.tcl)
+loadRuckusTcl "$::DIR_PATH/../../APx_Gen0_Algo/VivadoHls/null_algo_unpacked"
+#loadRuckusTcl  "/tmp/algo/APx_Gen0_Algo/VivadoHls/null_algo_unpacked"
