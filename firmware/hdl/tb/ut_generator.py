@@ -83,31 +83,31 @@ with open('input_text.txt', 'w') as f:
 		#200MHz clock
 		if c_200MHZ_CLK + t_step > 5.0/2:
 			c_200MHZ_CLK = 0
-			input_vars['clk_200_diff_in_clk_p'] = 1 if input_vars['clk_200_diff_in_clk_p'] == 0 else input_vars['clk_200_diff_in_clk_p'] = 0
-			input_vars['clk_200_diff_in_clk_n'] = 1 if input_vars['clk_200_diff_in_clk_n'] == 0 else input_vars['clk_200_diff_in_clk_n'] = 0
-			input_vars['axi_c2c_zynq_to_v7_clk'] = 1 if input_vars['axi_c2c_zynq_to_v7_clk'] == 0 else input_vars['axi_c2c_zynq_to_v7_clk'] = 0 # may use a  different clock
+			input_vars['clk_200_diff_in_clk_p'] = 1 if input_vars['clk_200_diff_in_clk_p'] == 0 else 0
+			input_vars['clk_200_diff_in_clk_n'] = 1 if input_vars['clk_200_diff_in_clk_n'] == 0 else 0
+			input_vars['axi_c2c_zynq_to_v7_clk'] = 1 if input_vars['axi_c2c_zynq_to_v7_clk'] == 0 else 0 # may use a  different clock
 		else:
 			c_200MHZ_CLK += t_step
 
 		#40MHz clock
 		if c_40MHZ_CLK > 25.0:
 			c_40MHZ_CLK = t_step
-			input_vars['clk_40_ttc_p_i'] = 1 if input_vars['clk_40_ttc_p_i'] == 0 else input_vars['clk_40_ttc_p_i'] = 0
-			input_vars['clk_40_ttc_n_i'] = 1 if input_vars['clk_40_ttc_n_i'] == 0 else input_vars['clk_40_ttc_n_i'] = 0
+			input_vars['clk_40_ttc_p_i'] = 1 if input_vars['clk_40_ttc_p_i'] == 0 else 0
+			input_vars['clk_40_ttc_n_i'] = 1 if input_vars['clk_40_ttc_n_i'] == 0 else 0
 		else:
 			c_40MHZ_CLK += t_step
 
 		#156.25MHz clock
 		if c_156MHZ_CLK > 3.200000:
 			c_156MHZ_CLK = t_step
-			input_vars['refclk_F_0_p_i'] = 1111 if input_vars['refclk_F_0_p_i'] == 0000 else input_vars['refclk_F_0_p_i'] = 0000
-			input_vars['refclk_F_0_n_i'] = 1111 if input_vars['refclk_F_0_n_i'] == 0000 else input_vars['refclk_F_0_n_i'] = 0000
-			input_vars['refclk_F_1_p_i'] = 1111 if input_vars['refclk_F_1_p_i'] == 0000 else input_vars['refclk_F_1_p_i'] = 0000
-			input_vars['refclk_F_1_n_i'] = 1111 if input_vars['refclk_F_1_n_i'] == 0000 else input_vars['refclk_F_1_n_i'] = 0000
-			input_vars['refclk_B_0_p_i'] = 1111 if input_vars['refclk_B_0_p_i'] == 0000 else input_vars['refclk_B_0_p_i'] = 0000
-			input_vars['refclk_B_0_n_i'] = 1111 if input_vars['refclk_B_0_n_i'] == 0000 else input_vars['refclk_B_0_n_i'] = 0000
-			input_vars['refclk_B_1_p_i'] = 1111 if input_vars['refclk_B_1_p_i'] == 0000 else input_vars['refclk_B_1_p_i'] = 0000
-			input_vars['refclk_B_1_n_i'] = 1111 if input_vars['refclk_B_1_n_i'] == 0000 else input_vars['refclk_B_1_n_i'] = 0000
+			input_vars['refclk_F_0_p_i'] = '1111' if input_vars['refclk_F_0_p_i'] == '0000' else '0000'
+			input_vars['refclk_F_0_n_i'] = '1111' if input_vars['refclk_F_0_n_i'] == '0000' else '0000'
+			input_vars['refclk_F_1_p_i'] = '1111' if input_vars['refclk_F_1_p_i'] == '0000' else '0000'
+			input_vars['refclk_F_1_n_i'] = '1111' if input_vars['refclk_F_1_n_i'] == '0000' else '0000'
+			input_vars['refclk_B_0_p_i'] = '1111' if input_vars['refclk_B_0_p_i'] == '0000' else '0000'
+			input_vars['refclk_B_0_n_i'] = '1111' if input_vars['refclk_B_0_n_i'] == '0000' else '0000'
+			input_vars['refclk_B_1_p_i'] = '1111' if input_vars['refclk_B_1_p_i'] == '0000' else '0000'
+			input_vars['refclk_B_1_n_i'] = '1111' if input_vars['refclk_B_1_n_i'] == '0000' else '0000'
 		else:
 			c_156MHZ_CLK += t_step
 
