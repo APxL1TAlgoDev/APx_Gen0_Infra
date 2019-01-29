@@ -15,6 +15,7 @@ set_property STEPS.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY rebuilt [get_runs synth_1
 # # Load local source Code and constraints
 loadSource      -dir "$::DIR_PATH/hdl/"
 loadConstraints -dir "$::DIR_PATH/constraints/"
+loadSource      -path "$::DIR_PATH/hdl/tb/tb_ctp7_top.vhd" # top test bench
 
 loadIpCore      -dir "$::DIR_PATH/ip_repo/"
 #loadSource      -dir "$::DIR_PATH/ip_repo/"

@@ -1,6 +1,9 @@
 import sys
 from collections import OrderedDict
 
+# variables to change
+top = 'ctp7_top' # name of module under test; test bench is named 'tb_{}'.format(top)
+
 time_elapsed = 0.0
 t_step = float(sys.argv[1])			#time step for each iteration
 duration = int(sys.argv[2]) + 2		#the number of iterations generated									#total time = t_step * duration (in ns)
@@ -119,17 +122,17 @@ with open('input_text.txt', 'w') as f:
 	f.close()
 
 # create a testbench
-with open('tb_top.vhd', 'w') as f:
+with open('tb_{}.vhd'.format(top), 'w') as f:
 
 	# header
 	f.write("-- libraries\n")
 	f.write("library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all; use ieee.std_logic_textio.all;\n")
 	f.write("-- Standard textIO functions\n")
 	f.write("library std; use std.textio.all;\n")
-	f.write("\nentity tb_top is\nend tb_top;\n")
+	f.write("\nentity tb_{} is\nend tb_{};\n".format(top,top))
 
 	# testbench architecture
-	f.write("\narchitecture behavior of tb_top is\n")
+	f.write("\narchitecture behavior of tb_{} is\n".format(top))
 	for key, val in input_vars.iteritems():
 		if isinstance(val, basestring):
 			f.write("	signal {} : std_logic_vector ({} downto 0);\n".format(key, len(val) - 1))
@@ -147,7 +150,7 @@ with open('tb_top.vhd', 'w') as f:
 	# architecture body begins
 	f.write("\nbegin\n")
 	f.write("\n-- Instantiate the Unit Under Test (UUT)\n")
-	f.write("	uut : entity work.top port map (\n")
+	f.write("	uut : entity work.{} port map (\n".format(top))
 
 	lines = []
 	for input_var in input_vars:
@@ -169,8 +172,8 @@ with open('tb_top.vhd', 'w') as f:
 	# Stimulus process write up
 	f.write("\n	);\n\n	-- Stimulus process\n")
 	f.write("	stim_proc : process\n")
-	f.write('		file InF: TEXT open READ_MODE is "../../../../../../framework/hdl/tb/vcu118/input_text.txt";\n')
-	f.write('		file OutF: TEXT open WRITE_MODE is "../../../../../../framework/hdl/tb/vcu118/output_text.txt";\n')
+	f.write('		file InF: TEXT open READ_MODE is "../../../../../../firmware/hdl/tb/input_text.txt";\n')
+	f.write('		file OutF: TEXT open WRITE_MODE is "../../../../../../firmware/hdl/tb/output_text.txt";\n')
 	f.write('		variable ILine: LINE; variable OLine: LINE; variable TimeWhen: TIME;\n')
 	bit_variables = []
 	vector_variables = []

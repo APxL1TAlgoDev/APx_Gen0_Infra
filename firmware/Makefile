@@ -5,6 +5,8 @@ target: bit
 export PRJ_VERSION = 0x00000001
 #
 export PROJECT = ctp7_top
+export VIVADO_PROJECT_SIM = tb_ctp7_top
+export VIVADO_PROJECT_SIM_TIME = 1100 ns # Simulation time with unit
 #
 # # Define target part
 export PRJ_PART = xc7vx690tffg1927-2
